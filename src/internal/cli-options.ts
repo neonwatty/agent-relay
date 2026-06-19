@@ -68,6 +68,16 @@ export interface ExportOptions {
   format: string
 }
 
+export interface PluginInstallCliOptions extends JsonOption {
+  codexHome?: string
+  skipCodex?: boolean
+  source?: string
+}
+
+export interface PluginDoctorCliOptions extends JsonOption {
+  codexHome?: string
+}
+
 export function collect(value: string, previous: string[]): string[] {
   previous.push(value)
   return previous

@@ -1,6 +1,6 @@
 {
   "name": "@neonwatty/agent-relay",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local machine-wide coordination ledger and bus for AI/developer sessions.",
   "type": "module",
   "license": "MIT",
@@ -20,9 +20,11 @@
     }
   },
   "files": [
+    ".agents/plugins/marketplace.json",
     "dist",
     "README.md",
-    "docs/agent-relay-design.md"
+    "docs/agent-relay-design.md",
+    "plugins/agent-relay"
   ],
   "scripts": {
     "build": "tsup",
