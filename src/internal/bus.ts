@@ -1,0 +1,236 @@
+import { nanoid } from "nanoid"
+import type { BusRecord, ClaimInput, ClaimQuery, ClaimResult, ClaimScope, NotifyInput, PresenceInput } from "../types.js"
+import { getConfig } from "./config.js"
+import { findScopeConflicts } from "./conflicts.js"
+import { openRelayDb, type RelayDb } from "./db.js"
+import { upsertProjectAndSession } from "./project-session.js"
+
+export function upsertPresence(input: PresenceInput): BusRecord {
+  const db = openRelayDb()
+
+  return db.transaction(() => {
+    const { project, session } = upsertProjectAndSession(db, {
+      project: input.project,
+      session: input.session,
+      role: input.role,
+      status: input.status ?? "active"
+    })
+    const now = getConfig().now()
+    const updatedAt = now.toISOString()
+    const expiresAt = new Date(now.getTime() + parseTtl(input.ttl ?? "10m")).toISOString()
+    const summary = input.role ?? "active"
+    const payload = { role: input.role }
+    const existing = db.prepare(`
+      select id
+      from bus_records
+      where project_id = ? and session_id = ? and kind = 'presence'
+      order by updated_at desc
+      limit 1
+    `).get(project.id, session.id) as { id: string } | undefined
+
+    if (existing) {
+      db.prepare(`
+        update bus_records
+        set summary = ?, payload_json = ?, expires_at = ?, updated_at = ?
+        where id = ?
+      `).run(summary, JSON.stringify(payload), expiresAt, updatedAt, existing.id)
+      return selectBusRecordById(db, existing.id)
+    }
+
+    return insertBusRecord(db, {
+      projectId: project.id,
+      sessionId: session.id,
+      kind: "presence",
+      summary,
+      payload,
+      expiresAt,
+      createdAt: updatedAt,
+      updatedAt
+    })
+  })()
+}
+
+export function createClaim(input: ClaimInput): ClaimResult {
+  if (input.scopes.length === 0) {
+    throw new Error("Claim requires at least one scope")
+  }
+
+  const db = openRelayDb()
+
+  return db.transaction(() => {
+    const activeClaims = listActiveClaims(input.project ? { project: input.project } : {})
+    const record = createBusRecord("claim", input, input.summary, { scopes: input.scopes }, parseTtl(input.ttl ?? "45m"))
+    const conflicts = findScopeConflicts(
+      activeClaims.map((claim) => ({
+        id: claim.id,
+        session: claim.session,
+        scopes: getClaimScopes(claim),
+        expiresAt: claim.expiresAt,
+        summary: claim.summary
+      })),
+      input.scopes
+    )
+
+    return { record, conflicts }
+  })()
+}
+
+export function releaseClaimById(id: string): boolean {
+  const db = openRelayDb()
+  const result = db.prepare("delete from bus_records where id = ? and kind = 'claim'").run(id)
+  return result.changes > 0
+}
+
+export function listActiveClaims(query: ClaimQuery = {}): BusRecord[] {
+  const db = openRelayDb()
+  const now = getConfig().now().toISOString()
+  const rows = query.project
+    ? db.prepare(`
+        select b.*, p.name as project_name, s.name as session_name
+        from bus_records b
+        join projects p on p.id = b.project_id
+        join sessions s on s.id = b.session_id
+        where b.kind = 'claim' and b.expires_at > ? and p.name = ?
+        order by b.created_at desc, b.rowid desc
+      `).all(now, query.project) as DbBusRecord[]
+    : db.prepare(`
+        select b.*, p.name as project_name, s.name as session_name
+        from bus_records b
+        join projects p on p.id = b.project_id
+        join sessions s on s.id = b.session_id
+        where b.kind = 'claim' and b.expires_at > ?
+        order by b.created_at desc, b.rowid desc
+      `).all(now) as DbBusRecord[]
+
+  return rows.map(mapBusRecord)
+}
+
+export function createNotification(input: NotifyInput): BusRecord {
+  return createBusRecord("notification", input, input.summary, input.payload ?? {}, parseTtl(input.ttl ?? "60m"))
+}
+
+export function parseTtl(ttl: string): number {
+  const match = ttl.match(/^(\d+)(m|h|d)$/)
+  if (!match) {
+    throw new Error(`Invalid TTL: ${ttl}`)
+  }
+
+  const value = Number(match[1])
+  const unit = match[2]
+  if (unit === "m") return value * 60 * 1000
+  if (unit === "h") return value * 60 * 60 * 1000
+  return value * 24 * 60 * 60 * 1000
+}
+
+function createBusRecord(
+  kind: BusRecord["kind"],
+  input: PresenceInput | ClaimInput | NotifyInput,
+  summary: string | undefined,
+  payload: unknown,
+  ttlMs: number
+): BusRecord {
+  const db = openRelayDb()
+  const { project, session } = upsertProjectAndSession(db, {
+    project: input.project,
+    session: input.session,
+    role: input.role,
+    status: input.status ?? "active"
+  })
+  const now = getConfig().now()
+  const createdAt = now.toISOString()
+  const expiresAt = new Date(now.getTime() + ttlMs).toISOString()
+
+  return insertBusRecord(db, {
+    projectId: project.id,
+    sessionId: session.id,
+    kind,
+    summary,
+    payload,
+    expiresAt,
+    createdAt,
+    updatedAt: createdAt
+  })
+}
+
+function insertBusRecord(
+  db: RelayDb,
+  input: {
+    projectId: string
+    sessionId: string
+    kind: BusRecord["kind"]
+    summary?: string
+    payload: unknown
+    expiresAt: string
+    createdAt: string
+    updatedAt: string
+  }
+): BusRecord {
+  const id = `bus_${nanoid()}`
+  db.prepare(`
+    insert into bus_records (id, project_id, session_id, kind, summary, payload_json, expires_at, created_at, updated_at)
+    values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    input.projectId,
+    input.sessionId,
+    input.kind,
+    input.summary ?? null,
+    JSON.stringify(input.payload),
+    input.expiresAt,
+    input.createdAt,
+    input.updatedAt
+  )
+
+  return selectBusRecordById(db, id)
+}
+
+function selectBusRecordById(db: RelayDb, id: string): BusRecord {
+  const row = db.prepare(`
+    select b.*, p.name as project_name, s.name as session_name
+    from bus_records b
+    join projects p on p.id = b.project_id
+    join sessions s on s.id = b.session_id
+    where b.id = ?
+  `).get(id) as DbBusRecord | undefined
+
+  if (!row) {
+    throw new Error(`Failed to load bus record ${id}`)
+  }
+
+  return mapBusRecord(row)
+}
+
+function getClaimScopes(record: BusRecord): ClaimScope[] {
+  const payload = record.payload as { scopes?: unknown }
+  return Array.isArray(payload.scopes) ? (payload.scopes as ClaimScope[]) : []
+}
+
+interface DbBusRecord {
+  id: string
+  project_id: string
+  session_id: string
+  project_name: string
+  session_name: string
+  kind: BusRecord["kind"]
+  summary: string | null
+  payload_json: string
+  expires_at: string
+  created_at: string
+  updated_at: string
+}
+
+function mapBusRecord(row: DbBusRecord): BusRecord {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    sessionId: row.session_id,
+    project: row.project_name,
+    session: row.session_name,
+    kind: row.kind,
+    summary: row.summary ?? undefined,
+    payload: JSON.parse(row.payload_json) as unknown,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  }
+}

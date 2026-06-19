@@ -82,3 +82,58 @@ export interface EventQuery {
   since?: string
   limit?: number
 }
+
+export type BusKind = "presence" | "claim" | "notification" | "handoff" | "wait-condition"
+
+export type ClaimScope =
+  | { kind: "files"; patterns: string[] }
+  | { kind: "resource"; name: string }
+  | { kind: "task"; name: string }
+
+export interface BusRecord {
+  id: string
+  projectId: string
+  sessionId: string
+  project: string
+  session: string
+  kind: BusKind
+  summary?: string
+  payload: unknown
+  expiresAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PresenceInput extends ProjectRefInput {
+  ttl?: string
+}
+
+export interface ClaimInput extends ProjectRefInput {
+  scopes: ClaimScope[]
+  ttl?: string
+  summary?: string
+}
+
+export interface ClaimResult {
+  record: BusRecord
+  conflicts: ClaimConflict[]
+}
+
+export interface ClaimConflict {
+  claimId: string
+  session: string
+  scope: ClaimScope
+  expiresAt: string
+  summary?: string
+  confidence: "exact" | "possible"
+}
+
+export interface ClaimQuery {
+  project?: string
+}
+
+export interface NotifyInput extends ProjectRefInput {
+  summary: string
+  payload?: unknown
+  ttl?: string
+}
