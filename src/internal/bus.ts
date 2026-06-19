@@ -157,6 +157,7 @@ export function createNotification(input: NotifyInput): BusRecord {
 
 export function createHandoff(input: HandoffInput): HandoffResult {
   validateHandoffInput(input)
+  const ttlMs = parseTtl(input.ttl ?? "24h")
 
   const event = publishEvent({
     project: input.project,
@@ -173,7 +174,7 @@ export function createHandoff(input: HandoffInput): HandoffResult {
     input,
     input.summary,
     { toRole: input.toRole, eventId: event.id, relatedEventId: input.eventId },
-    parseTtl(input.ttl ?? "24h")
+    ttlMs
   )
 
   return { event, notification }

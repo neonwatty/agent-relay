@@ -57,6 +57,25 @@ describe("handoff and cleanup", () => {
     expect(latest({ project: "pkg", type: "handoff.requested" })).toHaveLength(1)
   })
 
+  it("rejects invalid handoff TTLs before writing durable or bus records", () => {
+    setup()
+
+    expect(() =>
+      handoff({
+        project: "pkg",
+        session: "worker-a",
+        toRole: "docs",
+        summary: "Docs should cover the ESM caveat",
+        ttl: "soon"
+      })
+    ).toThrow(/Invalid TTL: soon/)
+
+    expect(latest({ project: "pkg", type: "handoff.requested" })).toHaveLength(0)
+    expect(openRelayDb().prepare("select count(*) as count from bus_records where kind = 'handoff'").get()).toEqual({
+      count: 0
+    })
+  })
+
   it("cleans expired bus records using the configured clock", () => {
     setup(() => new Date("2026-01-01T00:02:00.000Z"))
 
