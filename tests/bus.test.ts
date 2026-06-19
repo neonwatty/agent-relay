@@ -185,4 +185,25 @@ describe("bus internals", () => {
       })
     ])
   })
+
+  it("finds overlapping wildcard file pattern conflicts", () => {
+    const conflicts = findScopeConflicts(
+      [
+        {
+          id: "claim_wildcard",
+          session: "worker-a",
+          scopes: [{ kind: "files", patterns: ["src/*.ts"] }],
+          expiresAt: "2026-01-01T00:45:00.000Z"
+        }
+      ],
+      [{ kind: "files", patterns: ["src/index.*"] }]
+    )
+
+    expect(conflicts).toEqual([
+      expect.objectContaining({
+        claimId: "claim_wildcard",
+        confidence: "possible"
+      })
+    ])
+  })
 })

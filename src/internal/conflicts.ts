@@ -66,6 +66,10 @@ function filePatternsOverlap(a: string[], b: string[]): boolean {
         return true
       }
 
+      if (globPatternsCouldOverlap(left, right)) {
+        return true
+      }
+
       if (left.includes("**") || right.includes("**")) {
         const leftPrefix = left.split("**")[0]
         const rightPrefix = right.split("**")[0]
@@ -88,6 +92,59 @@ function normalizeTask(value: string): string {
 
 function globMatches(input: string, pattern: string): boolean {
   return globToRegExp(pattern).test(input)
+}
+
+function globPatternsCouldOverlap(a: string, b: string): boolean {
+  const leftSegments = a.split("/")
+  const rightSegments = b.split("/")
+
+  if (leftSegments.length !== rightSegments.length || leftSegments.includes("**") || rightSegments.includes("**")) {
+    return false
+  }
+
+  return leftSegments.every((left, index) => segmentsCouldOverlap(left, rightSegments[index]))
+}
+
+function segmentsCouldOverlap(a: string, b: string): boolean {
+  if (a === b || globMatches(b, a) || globMatches(a, b)) {
+    return true
+  }
+
+  if (!hasGlob(a) || !hasGlob(b)) {
+    return false
+  }
+
+  const left = wildcardBounds(a)
+  const right = wildcardBounds(b)
+  return prefixesCompatible(left.prefix, right.prefix) && suffixesCompatible(left.suffix, right.suffix)
+}
+
+function hasGlob(value: string): boolean {
+  return value.includes("*") || value.includes("?")
+}
+
+function wildcardBounds(value: string): { prefix: string; suffix: string } {
+  const firstWildcard = value.search(/[*?]/)
+  let lastWildcard = -1
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    if (value[index] === "*" || value[index] === "?") {
+      lastWildcard = index
+      break
+    }
+  }
+
+  return {
+    prefix: firstWildcard === -1 ? value : value.slice(0, firstWildcard),
+    suffix: lastWildcard === -1 ? value : value.slice(lastWildcard + 1)
+  }
+}
+
+function prefixesCompatible(a: string, b: string): boolean {
+  return a.startsWith(b) || b.startsWith(a)
+}
+
+function suffixesCompatible(a: string, b: string): boolean {
+  return a.endsWith(b) || b.endsWith(a)
 }
 
 function globToRegExp(pattern: string): RegExp {
