@@ -29,7 +29,7 @@ describe("agent-relay CLI", () => {
   it("publishes and reads latest JSON", () => {
     const homeDir = tempHome()
 
-    cli(
+    const publishOutput = cli(
       [
         "publish",
         "--project",
@@ -41,13 +41,32 @@ describe("agent-relay CLI", () => {
         "--status",
         "done",
         "--summary",
-        "Ready"
+        "Ready",
+        "--json"
       ],
       homeDir
     )
+    const published = JSON.parse(publishOutput) as {
+      id: string
+      project: string
+      session: string
+      type: string
+      status: string
+      summary: string
+    }
     const output = cli(["latest", "--project", "pkg", "--json"], homeDir)
     const events = JSON.parse(output) as Array<{ summary: string }>
 
+    expect(published).toEqual(
+      expect.objectContaining({
+        project: "pkg",
+        session: "worker",
+        type: "status.update",
+        status: "done",
+        summary: "Ready"
+      })
+    )
+    expect(published.id).toMatch(/^evt_/)
     expect(events[0]?.summary).toBe("Ready")
   })
 
