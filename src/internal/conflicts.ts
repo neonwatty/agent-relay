@@ -95,6 +95,7 @@ function globMatches(input: string, pattern: string): boolean {
 }
 
 function globPatternsCouldOverlap(a: string, b: string): boolean {
+  // Advisory only: this catches common wildcard overlaps, not every valid glob intersection.
   const leftSegments = a.split("/")
   const rightSegments = b.split("/")
 

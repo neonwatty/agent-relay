@@ -51,9 +51,7 @@ export function upsertPresence(input: PresenceInput): BusRecord {
 }
 
 export function createClaim(input: ClaimInput): ClaimResult {
-  if (input.scopes.length === 0) {
-    throw new Error("Claim requires at least one scope")
-  }
+  validateClaimInput(input)
 
   const db = openRelayDb()
 
@@ -72,7 +70,7 @@ export function createClaim(input: ClaimInput): ClaimResult {
     )
 
     return { record, conflicts }
-  })()
+  }).immediate()
 }
 
 export function releaseClaimById(id: string): boolean {
@@ -106,7 +104,8 @@ export function listActiveClaims(query: ClaimQuery = {}): BusRecord[] {
 }
 
 export function createNotification(input: NotifyInput): BusRecord {
-  return createBusRecord("notification", input, input.summary, input.payload ?? {}, parseTtl(input.ttl ?? "60m"))
+  const payload = Object.hasOwn(input, "payload") ? input.payload : {}
+  return createBusRecord("notification", input, input.summary, payload, parseTtl(input.ttl ?? "60m"))
 }
 
 export function parseTtl(ttl: string): number {
@@ -150,6 +149,26 @@ function createBusRecord(
     createdAt,
     updatedAt: createdAt
   })
+}
+
+function validateClaimInput(input: ClaimInput): void {
+  if (input.scopes.length === 0) {
+    throw new Error("Claim requires at least one scope")
+  }
+
+  for (const scope of input.scopes) {
+    if (scope.kind === "files") {
+      if (scope.patterns.length === 0 || scope.patterns.some((pattern) => pattern.trim().length === 0)) {
+        throw new Error("Files claim scope requires at least one non-empty pattern")
+      }
+    } else if (scope.kind === "resource") {
+      if (scope.name.trim().length === 0) {
+        throw new Error("Resource claim scope requires a non-empty name")
+      }
+    } else if (scope.kind === "task" && scope.name.trim().length === 0) {
+      throw new Error("Task claim scope requires a non-empty name")
+    }
+  }
 }
 
 function insertBusRecord(

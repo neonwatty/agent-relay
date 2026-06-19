@@ -87,6 +87,52 @@ describe("bus API", () => {
     expect(() => claim({ project: "pkg", session: "worker-a", scopes: [] })).toThrow(/scope/i)
   })
 
+  it("rejects invalid claim scope values", () => {
+    setup()
+
+    expect(() =>
+      claim({
+        project: "pkg",
+        session: "worker-a",
+        scopes: [{ kind: "files", patterns: [] }]
+      })
+    ).toThrow(/pattern/i)
+    expect(() =>
+      claim({
+        project: "pkg",
+        session: "worker-a",
+        scopes: [{ kind: "files", patterns: ["src/**", "  "] }]
+      })
+    ).toThrow(/pattern/i)
+    expect(() =>
+      claim({
+        project: "pkg",
+        session: "worker-a",
+        scopes: [{ kind: "resource", name: "  " }]
+      })
+    ).toThrow(/resource/i)
+    expect(() =>
+      claim({
+        project: "pkg",
+        session: "worker-a",
+        scopes: [{ kind: "task", name: "  " }]
+      })
+    ).toThrow(/task/i)
+  })
+
+  it("rejects invalid claim TTLs with a clear error", () => {
+    setup()
+
+    expect(() =>
+      claim({
+        project: "pkg",
+        session: "worker-a",
+        scopes: [{ kind: "resource", name: "db" }],
+        ttl: "soon"
+      })
+    ).toThrow(/Invalid TTL: soon/)
+  })
+
   it("ignores expired claims and filters active claims by project", () => {
     let currentTime = "2026-01-01T00:00:00.000Z"
     setup(() => new Date(currentTime))
@@ -154,6 +200,25 @@ describe("bus API", () => {
     expect(record.kind).toBe("notification")
     expect(record.summary).toBe("Artifact ready")
     expect(record.payload).toEqual({ eventId: "evt_123" })
+  })
+
+  it("preserves explicit null notification payloads", () => {
+    setup()
+
+    const explicitNull = notify({
+      project: "pkg",
+      session: "worker-a",
+      summary: "No payload",
+      payload: null
+    })
+    const omitted = notify({
+      project: "pkg",
+      session: "worker-a",
+      summary: "Default payload"
+    })
+
+    expect(explicitNull.payload).toBeNull()
+    expect(omitted.payload).toEqual({})
   })
 })
 
