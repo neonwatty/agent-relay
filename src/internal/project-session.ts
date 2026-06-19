@@ -60,46 +60,32 @@ export function upsertProjectAndSession(
   const sessionName = input.session ?? config.defaultSession ?? `session-${process.pid}`
   const status = input.status ?? "active"
 
-  let project = db.prepare("select * from projects where name = ? and root_path = ?").get(
+  db.prepare(`
+    insert into projects (id, name, root_path, created_at, updated_at)
+    values (?, ?, ?, ?, ?)
+    on conflict(name, root_path) do update set updated_at = excluded.updated_at
+  `).run(`proj_${nanoid()}`, resolvedProject.name, resolvedProject.rootPath, now, now)
+
+  const project = db.prepare("select * from projects where name = ? and root_path = ?").get(
     resolvedProject.name,
     resolvedProject.rootPath
-  ) as DbProject | undefined
+  ) as DbProject
 
-  if (!project) {
-    const id = `proj_${nanoid()}`
-    db.prepare("insert into projects (id, name, root_path, created_at, updated_at) values (?, ?, ?, ?, ?)").run(
-      id,
-      resolvedProject.name,
-      resolvedProject.rootPath,
-      now,
-      now
-    )
-    project = db.prepare("select * from projects where id = ?").get(id) as DbProject
-  } else {
-    db.prepare("update projects set updated_at = ? where id = ?").run(now, project.id)
-    project = db.prepare("select * from projects where id = ?").get(project.id) as DbProject
-  }
+  db.prepare(`
+    insert into sessions (id, project_id, name, role, cwd, status, last_seen_at, created_at, updated_at)
+    values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    on conflict(project_id, name) do update set
+      role = coalesce(excluded.role, sessions.role),
+      cwd = excluded.cwd,
+      status = excluded.status,
+      last_seen_at = excluded.last_seen_at,
+      updated_at = excluded.updated_at
+  `).run(`sess_${nanoid()}`, project.id, sessionName, input.role ?? null, config.cwd, status, now, now, now)
 
-  let session = db.prepare("select * from sessions where project_id = ? and name = ?").get(
+  const session = db.prepare("select * from sessions where project_id = ? and name = ?").get(
     project.id,
     sessionName
-  ) as DbSession | undefined
-
-  if (!session) {
-    const id = `sess_${nanoid()}`
-    db.prepare(`
-      insert into sessions (id, project_id, name, role, cwd, status, last_seen_at, created_at, updated_at)
-      values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, project.id, sessionName, input.role ?? null, config.cwd, status, now, now, now)
-    session = db.prepare("select * from sessions where id = ?").get(id) as DbSession
-  } else {
-    db.prepare(`
-      update sessions
-      set role = coalesce(?, role), cwd = ?, status = ?, last_seen_at = ?, updated_at = ?
-      where id = ?
-    `).run(input.role ?? null, config.cwd, status, now, now, session.id)
-    session = db.prepare("select * from sessions where id = ?").get(session.id) as DbSession
-  }
+  ) as DbSession
 
   return { project: mapProject(project), session: mapSession(session) }
 }
