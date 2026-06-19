@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process"
+import { execFileSync, spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -25,7 +25,22 @@ function cli(args: string[], homeDir: string) {
   })
 }
 
+function cliResult(args: string[], homeDir = tempHome()) {
+  return spawnSync("node", ["dist/cli.js", ...args], {
+    encoding: "utf8",
+    env: { ...process.env, AGENT_RELAY_HOME: homeDir }
+  })
+}
+
 describe("agent-relay CLI", () => {
+  it("prints version to stdout only", () => {
+    const result = cliResult(["--version"])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain("0.1.0")
+    expect(result.stderr).toBe("")
+  })
+
   it("publishes and reads latest JSON", () => {
     const homeDir = tempHome()
 
@@ -70,6 +85,37 @@ describe("agent-relay CLI", () => {
     expect(events[0]?.summary).toBe("Ready")
   })
 
+  it("prints commander errors once", () => {
+    const unknown = cliResult(["nope"])
+    const missing = cliResult(["publish"])
+
+    expect(unknown.status).not.toBe(0)
+    expect(unknown.stderr).toContain("unknown command 'nope'")
+    expect(countOccurrences(unknown.stderr, "unknown command 'nope'")).toBe(1)
+
+    expect(missing.status).not.toBe(0)
+    expect(missing.stderr).toContain("required option '--summary <summary>' not specified")
+    expect(countOccurrences(missing.stderr, "required option '--summary <summary>' not specified")).toBe(1)
+  })
+
+  it("rejects invalid bus statuses", () => {
+    const homeDir = tempHome()
+    const presence = cliResult(["presence", "--project", "pkg", "--session", "a", "--status", "banana"], homeDir)
+    const claim = cliResult(
+      ["claim", "--project", "pkg", "--session", "a", "--files", "src/**", "--status", "banana"],
+      homeDir
+    )
+    const notify = cliResult(
+      ["notify", "--project", "pkg", "--session", "a", "--summary", "Hello", "--status", "banana"],
+      homeDir
+    )
+
+    for (const result of [presence, claim, notify]) {
+      expect(result.status).not.toBe(0)
+      expect(result.stderr).toContain("Invalid status: banana")
+    }
+  })
+
   it("creates claim conflict output", () => {
     const homeDir = tempHome()
 
@@ -94,3 +140,7 @@ describe("agent-relay CLI", () => {
     expect(events.map((event) => event.summary)).toEqual(["First", "Second"])
   })
 })
+
+function countOccurrences(value: string, search: string): number {
+  return value.split(search).length - 1
+}

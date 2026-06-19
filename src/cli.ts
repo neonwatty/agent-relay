@@ -80,7 +80,7 @@ program
     const input: PresenceInput = {
       project: options.project,
       session: options.session,
-      status: options.status as RelayStatus | undefined,
+      status: parseOptionalStatus(options.status),
       role: options.role,
       ttl: options.ttl
     }
@@ -104,7 +104,7 @@ program
       claim({
         project: options.project,
         session: options.session,
-        status: options.status as RelayStatus | undefined,
+        status: parseOptionalStatus(options.status),
         scopes: toClaimScopes(options),
         summary: options.summary,
         ttl: options.ttl
@@ -144,7 +144,7 @@ program
     const input: NotifyInput = {
       project: options.project,
       session: options.session,
-      status: options.status as RelayStatus | undefined,
+      status: parseOptionalStatus(options.status),
       summary: options.summary,
       ttl: options.ttl
     }
@@ -166,7 +166,7 @@ program
 try {
   program.parse()
 } catch (error) {
-  if (error instanceof CommanderError && error.code === "commander.helpDisplayed") {
+  if (error instanceof CommanderError) {
     process.exit(error.exitCode)
   }
 
@@ -245,6 +245,22 @@ function parseLimit(value: string): number {
     throw new Error(`Invalid limit: ${value}`)
   }
   return limit
+}
+
+function parseOptionalStatus(value: string | undefined): RelayStatus | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (isRelayStatus(value)) {
+    return value
+  }
+
+  throw new Error(`Invalid status: ${value}`)
+}
+
+function isRelayStatus(value: string): value is RelayStatus {
+  return ["info", "todo", "active", "blocked", "done", "failed", "superseded"].includes(value)
 }
 
 function toEventQuery(options: EventQueryOptions): EventQuery {
