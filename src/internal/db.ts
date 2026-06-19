@@ -30,7 +30,7 @@ export function closeRelayDb(): void {
   db = undefined
 }
 
-export function migrate(database: RelayDb): void {
+function migrate(database: RelayDb): void {
   const version = database.pragma("user_version", { simple: true }) as number
   if (version < 1) {
     database.exec(MIGRATION_001)

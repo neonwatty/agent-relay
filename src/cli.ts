@@ -1,9 +1,25 @@
 import { Command, CommanderError } from "commander"
 import { cleanupExpiredBusRecords, claim, handoff, listClaims, notify, presence, releaseClaim } from "./bus.js"
 import { latest, publish, search } from "./index.js"
+import {
+  collect,
+  parseLimit,
+  parseOptionalStatus,
+  toClaimScopes,
+  toEventQuery,
+  type ClaimOptions,
+  type ClaimsOptions,
+  type EventQueryOptions,
+  type ExportOptions,
+  type HandoffOptions,
+  type JsonOption,
+  type NotifyOptions,
+  type PresenceOptions,
+  type PublishOptions
+} from "./internal/cli-options.js"
 import { exportJsonl } from "./internal/export.js"
 import { writeOutput } from "./internal/format.js"
-import type { ClaimScope, EventQuery, HandoffInput, NotifyInput, PresenceInput, RelayStatus } from "./types.js"
+import type { HandoffInput, NotifyInput, PresenceInput, RelayStatus } from "./types.js"
 
 const program = new Command()
 
@@ -203,121 +219,4 @@ try {
   const message = error instanceof Error ? error.message : String(error)
   process.stderr.write(`agent-relay: ${message}\n`)
   process.exit(error instanceof CommanderError ? error.exitCode : 1)
-}
-
-interface JsonOption {
-  json?: boolean
-}
-
-interface PublishOptions extends JsonOption {
-  project?: string
-  session?: string
-  type: string
-  status: string
-  summary: string
-  details?: string
-  tag: string[]
-}
-
-interface EventQueryOptions extends JsonOption {
-  project?: string
-  session?: string
-  type?: string
-  status?: string
-  tag?: string
-  since?: string
-  limit?: number
-}
-
-interface PresenceOptions extends JsonOption {
-  project?: string
-  session?: string
-  status?: string
-  role?: string
-  ttl?: string
-}
-
-interface ClaimOptions extends JsonOption {
-  project?: string
-  session?: string
-  status?: string
-  files: string[]
-  resource: string[]
-  task: string[]
-  summary?: string
-  ttl?: string
-}
-
-interface ClaimsOptions extends JsonOption {
-  project?: string
-}
-
-interface NotifyOptions extends JsonOption {
-  project?: string
-  session?: string
-  status?: string
-  summary: string
-  ttl?: string
-}
-
-interface HandoffOptions extends JsonOption {
-  project?: string
-  session?: string
-  toRole: string
-  summary: string
-  eventId?: string
-  ttl?: string
-}
-
-interface ExportOptions {
-  format: string
-}
-
-function collect(value: string, previous: string[]): string[] {
-  previous.push(value)
-  return previous
-}
-
-function parseLimit(value: string): number {
-  const limit = Number(value)
-  if (!Number.isInteger(limit) || limit <= 0) {
-    throw new Error(`Invalid limit: ${value}`)
-  }
-  return limit
-}
-
-function parseOptionalStatus(value: string | undefined): RelayStatus | undefined {
-  if (value === undefined) {
-    return undefined
-  }
-
-  if (isRelayStatus(value)) {
-    return value
-  }
-
-  throw new Error(`Invalid status: ${value}`)
-}
-
-function isRelayStatus(value: string): value is RelayStatus {
-  return ["info", "todo", "active", "blocked", "done", "failed", "superseded"].includes(value)
-}
-
-function toEventQuery(options: EventQueryOptions): EventQuery {
-  return {
-    project: options.project,
-    session: options.session,
-    type: options.type,
-    status: options.status as RelayStatus | undefined,
-    tag: options.tag,
-    since: options.since,
-    limit: options.limit
-  }
-}
-
-function toClaimScopes(options: ClaimOptions): ClaimScope[] {
-  return [
-    ...(options.files.length ? [{ kind: "files" as const, patterns: options.files }] : []),
-    ...options.resource.map((name) => ({ kind: "resource" as const, name })),
-    ...options.task.map((name) => ({ kind: "task" as const, name }))
-  ]
 }

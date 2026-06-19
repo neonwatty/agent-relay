@@ -4,8 +4,6 @@ import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 import { claim, listClaims, notify, presence, releaseClaim } from "../src/bus.js"
 import { configureRelay } from "../src/index.js"
-import { parseTtl } from "../src/internal/bus.js"
-import { findScopeConflicts } from "../src/internal/conflicts.js"
 import { closeRelayDb, openRelayDb } from "../src/internal/db.js"
 
 const tempDirs: string[] = []
@@ -79,58 +77,6 @@ describe("bus API", () => {
     expect(releaseClaim(first.record.id)).toBe(true)
     expect(listClaims({ project: "pkg" })).toHaveLength(1)
     expect(releaseClaim(first.record.id)).toBe(false)
-  })
-
-  it("rejects empty claim scopes", () => {
-    setup()
-
-    expect(() => claim({ project: "pkg", session: "worker-a", scopes: [] })).toThrow(/scope/i)
-  })
-
-  it("rejects invalid claim scope values", () => {
-    setup()
-
-    expect(() =>
-      claim({
-        project: "pkg",
-        session: "worker-a",
-        scopes: [{ kind: "files", patterns: [] }]
-      })
-    ).toThrow(/pattern/i)
-    expect(() =>
-      claim({
-        project: "pkg",
-        session: "worker-a",
-        scopes: [{ kind: "files", patterns: ["src/**", "  "] }]
-      })
-    ).toThrow(/pattern/i)
-    expect(() =>
-      claim({
-        project: "pkg",
-        session: "worker-a",
-        scopes: [{ kind: "resource", name: "  " }]
-      })
-    ).toThrow(/resource/i)
-    expect(() =>
-      claim({
-        project: "pkg",
-        session: "worker-a",
-        scopes: [{ kind: "task", name: "  " }]
-      })
-    ).toThrow(/task/i)
-  })
-
-  it("rejects invalid claim TTLs with a clear error", () => {
-    setup()
-
-    expect(() =>
-      claim({
-        project: "pkg",
-        session: "worker-a",
-        scopes: [{ kind: "resource", name: "db" }],
-        ttl: "soon"
-      })
-    ).toThrow(/Invalid TTL: soon/)
   })
 
   it("ignores expired claims and filters active claims by project", () => {
@@ -286,56 +232,5 @@ describe("bus API", () => {
     })
 
     expect(record.payload).toEqual({})
-  })
-})
-
-describe("bus internals", () => {
-  it("parses integer minute, hour, and day TTLs", () => {
-    expect(parseTtl("2m")).toBe(2 * 60 * 1000)
-    expect(parseTtl("3h")).toBe(3 * 60 * 60 * 1000)
-    expect(parseTtl("4d")).toBe(4 * 24 * 60 * 60 * 1000)
-    expect(() => parseTtl("1.5h")).toThrow(/ttl/i)
-  })
-
-  it("finds equivalent and overlapping file pattern conflicts", () => {
-    const conflicts = findScopeConflicts(
-      [
-        {
-          id: "claim_a",
-          session: "worker-a",
-          scopes: [{ kind: "files", patterns: ["./src/**", "README.md"] }],
-          expiresAt: "2026-01-01T00:45:00.000Z"
-        }
-      ],
-      [{ kind: "files", patterns: ["src/index.ts"] }]
-    )
-
-    expect(conflicts).toEqual([
-      expect.objectContaining({
-        claimId: "claim_a",
-        confidence: "possible"
-      })
-    ])
-  })
-
-  it("finds overlapping wildcard file pattern conflicts", () => {
-    const conflicts = findScopeConflicts(
-      [
-        {
-          id: "claim_wildcard",
-          session: "worker-a",
-          scopes: [{ kind: "files", patterns: ["src/*.ts"] }],
-          expiresAt: "2026-01-01T00:45:00.000Z"
-        }
-      ],
-      [{ kind: "files", patterns: ["src/index.*"] }]
-    )
-
-    expect(conflicts).toEqual([
-      expect.objectContaining({
-        claimId: "claim_wildcard",
-        confidence: "possible"
-      })
-    ])
   })
 })

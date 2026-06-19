@@ -1,16 +1,16 @@
 import { z } from "zod"
 
-export const SUMMARY_LIMIT = 500
-export const DETAILS_LIMIT = 16 * 1024
-export const TAG_LIMIT = 20
-export const LINK_LIMIT = 20
+const SUMMARY_LIMIT = 500
+const DETAILS_LIMIT = 16 * 1024
+const TAG_LIMIT = 20
+const LINK_LIMIT = 20
 export const DEFAULT_LATEST_LIMIT = 20
 export const DEFAULT_SEARCH_LIMIT = 100
-export const MAX_QUERY_LIMIT = 500
+const MAX_QUERY_LIMIT = 500
 
-export const statusSchema = z.enum(["info", "todo", "active", "blocked", "done", "failed", "superseded"])
+const statusSchema = z.enum(["info", "todo", "active", "blocked", "done", "failed", "superseded"])
 
-export const linkSchema = z.union([
+const linkSchema = z.union([
   z.object({ kind: z.literal("file"), path: z.string().min(1), url: z.undefined().optional() }),
   z.object({ kind: z.literal("url"), url: z.string().url(), path: z.undefined().optional() })
 ])
