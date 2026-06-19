@@ -34,7 +34,7 @@ export function resolveProject(input: ProjectRefInput): ResolvedProjectInput {
   const config = getConfig()
   const explicitProject = input.project ?? config.defaultProject
   if (explicitProject) {
-    return { name: explicitProject, rootPath: config.cwd }
+    return { name: explicitProject, rootPath: inferProjectRoot(config.cwd) }
   }
 
   const packageProject = findPackageProject(config.cwd)
@@ -48,6 +48,10 @@ export function resolveProject(input: ProjectRefInput): ResolvedProjectInput {
   }
 
   return { name: basename(config.cwd), rootPath: config.cwd }
+}
+
+function inferProjectRoot(start: string): string {
+  return findUp(start, "package.json") ?? findUp(start, ".git") ?? resolve(start)
 }
 
 export function upsertProjectAndSession(

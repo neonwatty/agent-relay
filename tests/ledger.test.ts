@@ -87,6 +87,27 @@ describe("ledger API", () => {
     expect(search().map((event) => event.id)).toEqual([second.id, first.id])
   })
 
+  it("finds explicit project events from subdirectories under the same root", () => {
+    const homeDir = tempHome()
+    const root = join(homeDir, "workspace")
+    const src = join(root, "src")
+    mkdirSync(src, { recursive: true })
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "package-name" }))
+
+    configureRelay({ homeDir, cwd: root })
+    const event = publish({
+      project: "explicit-name",
+      session: "worker",
+      type: "status.update",
+      status: "done",
+      summary: "Root event"
+    })
+
+    configureRelay({ homeDir, cwd: src })
+    expect(latest({ project: "explicit-name" }).map((result) => result.id)).toEqual([event.id])
+    expect(search({ project: "explicit-name" }).map((result) => result.id)).toEqual([event.id])
+  })
+
   it("uses the configured clock for event timestamps", () => {
     const dir = tempHome()
     configureRelay({ homeDir: dir, cwd: dir, now: () => new Date("2026-01-01T00:00:00.000Z") })

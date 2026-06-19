@@ -36,6 +36,18 @@ describe("project and session resolution", () => {
     expect(project.rootPath).toBe(cwd)
   })
 
+  it("uses explicit project names with inferred project roots", () => {
+    const homeDir = tempDir()
+    const root = tempDir()
+    const cwd = join(root, "src")
+    mkdirSync(cwd, { recursive: true })
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@scope/root-package" }))
+    configureRelay({ homeDir, cwd })
+    const project = resolveProject({ project: "explicit-name" })
+    expect(project.name).toBe("explicit-name")
+    expect(project.rootPath).toBe(root)
+  })
+
   it("infers nearest package name", () => {
     const homeDir = tempDir()
     const root = tempDir()
