@@ -52,12 +52,30 @@ export function upsertPresence(input: PresenceInput): BusRecord {
 
 export function createClaim(input: ClaimInput): ClaimResult {
   validateClaimInput(input)
+  const ttlMs = parseTtl(input.ttl ?? "45m")
 
   const db = openRelayDb()
 
   return db.transaction(() => {
-    const activeClaims = listActiveClaims(input.project ? { project: input.project } : {})
-    const record = createBusRecord("claim", input, input.summary, { scopes: input.scopes }, parseTtl(input.ttl ?? "45m"))
+    const { project, session } = upsertProjectAndSession(db, {
+      project: input.project,
+      session: input.session,
+      role: input.role,
+      status: input.status ?? "active"
+    })
+    const activeClaims = listActiveClaimsByProjectId(db, project.id)
+    const now = getConfig().now()
+    const createdAt = now.toISOString()
+    const record = insertBusRecord(db, {
+      projectId: project.id,
+      sessionId: session.id,
+      kind: "claim",
+      summary: input.summary,
+      payload: { scopes: input.scopes },
+      expiresAt: new Date(now.getTime() + ttlMs).toISOString(),
+      createdAt,
+      updatedAt: createdAt
+    })
     const conflicts = findScopeConflicts(
       activeClaims.map((claim) => ({
         id: claim.id,
@@ -99,6 +117,19 @@ export function listActiveClaims(query: ClaimQuery = {}): BusRecord[] {
         where b.kind = 'claim' and b.expires_at > ?
         order by b.created_at desc, b.rowid desc
       `).all(now) as DbBusRecord[]
+
+  return rows.map(mapBusRecord)
+}
+
+function listActiveClaimsByProjectId(db: RelayDb, projectId: string): BusRecord[] {
+  const rows = db.prepare(`
+    select b.*, p.name as project_name, s.name as session_name
+    from bus_records b
+    join projects p on p.id = b.project_id
+    join sessions s on s.id = b.session_id
+    where b.kind = 'claim' and b.expires_at > ? and b.project_id = ?
+    order by b.created_at desc, b.rowid desc
+  `).all(getConfig().now().toISOString(), projectId) as DbBusRecord[]
 
   return rows.map(mapBusRecord)
 }

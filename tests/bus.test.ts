@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
@@ -185,6 +185,32 @@ describe("bus API", () => {
         confidence: "possible"
       })
     )
+  })
+
+  it("scopes implicit claim conflicts to the resolved project", () => {
+    const homeDir = setup()
+    const firstProject = join(homeDir, "first-project")
+    const secondProject = join(homeDir, "second-project")
+    mkdirSync(firstProject)
+    mkdirSync(secondProject)
+    writeFileSync(join(firstProject, "package.json"), JSON.stringify({ name: "first-project" }))
+    writeFileSync(join(secondProject, "package.json"), JSON.stringify({ name: "second-project" }))
+
+    configureRelay({ homeDir, cwd: firstProject })
+    const first = claim({
+      session: "worker-a",
+      scopes: [{ kind: "resource", name: "shared-db" }]
+    })
+
+    configureRelay({ homeDir, cwd: secondProject })
+    const second = claim({
+      session: "worker-b",
+      scopes: [{ kind: "resource", name: "shared-db" }]
+    })
+
+    expect(first.record.project).toBe("first-project")
+    expect(second.record.project).toBe("second-project")
+    expect(second.conflicts).toEqual([])
   })
 
   it("creates notifications", () => {
