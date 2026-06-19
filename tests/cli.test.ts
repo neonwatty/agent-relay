@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
@@ -35,9 +35,10 @@ function cliResult(args: string[], homeDir = tempHome()) {
 describe("agent-relay CLI", () => {
   it("prints version to stdout only", () => {
     const result = cliResult(["--version"])
+    const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as { version: string }
 
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain("0.1.0")
+    expect(result.stdout).toContain(packageJson.version)
     expect(result.stderr).toBe("")
   })
 

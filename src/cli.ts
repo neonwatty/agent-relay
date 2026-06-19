@@ -14,11 +14,14 @@ import {
   type HandoffOptions,
   type JsonOption,
   type NotifyOptions,
+  type PluginDoctorCliOptions,
+  type PluginInstallCliOptions,
   type PresenceOptions,
   type PublishOptions
 } from "./internal/cli-options.js"
 import { exportJsonl } from "./internal/export.js"
 import { writeOutput } from "./internal/format.js"
+import { doctorCodexPlugin, installCodexPlugin } from "./internal/plugin-install.js"
 import type { HandoffInput, NotifyInput, PresenceInput, RelayStatus } from "./types.js"
 
 const program = new Command()
@@ -26,7 +29,7 @@ const program = new Command()
 program
   .name("agent-relay")
   .description("Local coordination ledger and bus for AI/developer sessions")
-  .version("0.1.0")
+  .version("0.1.1")
   .exitOverride()
 
 program
@@ -207,6 +210,39 @@ program
     }
     const output = exportJsonl()
     process.stdout.write(output ? `${output}\n` : "")
+  })
+
+const pluginProgram = program.command("plugin").description("Manage Agent Relay plugin integrations")
+
+pluginProgram
+  .command("install")
+  .description("Install the bundled Codex plugin")
+  .option("--codex-home <path>")
+  .option("--source <source>", "Codex marketplace source", "neonwatty/agent-relay")
+  .option("--skip-codex", "skip running codex plugin marketplace add")
+  .option("--json")
+  .action((options: PluginInstallCliOptions) => {
+    writeOutput(
+      installCodexPlugin({
+        codexHome: options.codexHome,
+        source: options.source,
+        skipCodex: Boolean(options.skipCodex)
+      }),
+      Boolean(options.json)
+    )
+  })
+
+pluginProgram
+  .command("doctor")
+  .description("Check the bundled Codex plugin install")
+  .option("--codex-home <path>")
+  .option("--json")
+  .action((options: PluginDoctorCliOptions) => {
+    const result = doctorCodexPlugin({ codexHome: options.codexHome })
+    writeOutput(result, Boolean(options.json))
+    if (!result.ok) {
+      process.exitCode = 1
+    }
   })
 
 try {

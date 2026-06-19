@@ -1,0 +1,42 @@
+{
+  "name": "agent-relay",
+  "version": "0.1.1",
+  "description": "Agent-facing Codex plugin for Agent Relay session coordination.",
+  "author": {
+    "name": "neonwatty",
+    "url": "https://github.com/neonwatty"
+  },
+  "homepage": "https://github.com/neonwatty/agent-relay#readme",
+  "repository": "https://github.com/neonwatty/agent-relay",
+  "license": "MIT",
+  "keywords": [
+    "agent-relay",
+    "codex",
+    "sessions",
+    "coordination",
+    "ledger",
+    "bus"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Agent Relay",
+    "shortDescription": "Shared status, claims, and handoffs for parallel sessions",
+    "longDescription": "Agent Relay gives Codex sessions a local machine-wide coordination layer. Agents can publish explicit status updates, inspect recent project context, claim independent work scopes, release claims, and create handoffs without reading each other's transcript history.",
+    "developerName": "neonwatty",
+    "category": "Coding",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/neonwatty/agent-relay",
+    "privacyPolicyURL": "https://github.com/neonwatty/agent-relay#privacy",
+    "termsOfServiceURL": "https://github.com/neonwatty/agent-relay#license",
+    "defaultPrompt": [
+      "Use Agent Relay to check project status",
+      "Claim files before parallel work",
+      "Publish a handoff for another session"
+    ],
+    "brandColor": "#14B8A6",
+    "screenshots": []
+  }
+}

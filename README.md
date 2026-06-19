@@ -16,6 +16,24 @@ Session history = never imported
 npm install -g @neonwatty/agent-relay
 ```
 
+Install the Codex plugin from the npm package:
+
+```bash
+npx @neonwatty/agent-relay plugin install
+```
+
+Or, after a global install:
+
+```bash
+agent-relay plugin install
+```
+
+Check the Codex plugin install:
+
+```bash
+agent-relay plugin doctor
+```
+
 ## CLI
 
 ```bash
