@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
@@ -51,6 +51,40 @@ describe("ledger API", () => {
     expect(search({ project: "pkg", tag: "esm" })).toHaveLength(1)
     expect(search({ project: "pkg", type: "status.update" })).toHaveLength(1)
     expect(search({ project: "pkg", session: "a", status: "active" })[0]?.summary).toBe("Working")
+  })
+
+  it("scopes same-name project event queries to the current root", () => {
+    const homeDir = tempHome()
+    const firstRoot = join(homeDir, "workspace-a")
+    const secondRoot = join(homeDir, "workspace-b")
+    mkdirSync(firstRoot)
+    mkdirSync(secondRoot)
+    writeFileSync(join(firstRoot, "package.json"), JSON.stringify({ name: "shared-package" }))
+    writeFileSync(join(secondRoot, "package.json"), JSON.stringify({ name: "shared-package" }))
+
+    configureRelay({ homeDir, cwd: firstRoot })
+    const first = publish({
+      session: "worker-a",
+      type: "status.update",
+      status: "done",
+      summary: "First root event"
+    })
+
+    configureRelay({ homeDir, cwd: secondRoot })
+    const second = publish({
+      session: "worker-b",
+      type: "status.update",
+      status: "done",
+      summary: "Second root event"
+    })
+
+    expect(latest({ project: "shared-package" }).map((event) => event.id)).toEqual([second.id])
+    expect(search({ project: "shared-package" }).map((event) => event.id)).toEqual([second.id])
+
+    configureRelay({ homeDir, cwd: firstRoot })
+    expect(latest({ project: "shared-package" }).map((event) => event.id)).toEqual([first.id])
+    expect(search({ project: "shared-package" }).map((event) => event.id)).toEqual([first.id])
+    expect(search().map((event) => event.id)).toEqual([second.id, first.id])
   })
 
   it("uses the configured clock for event timestamps", () => {

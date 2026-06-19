@@ -274,6 +274,19 @@ describe("bus API", () => {
     expect(explicitNull.payload).toBeNull()
     expect(omitted.payload).toEqual({})
   })
+
+  it("treats explicit undefined notification payloads like omitted payloads", () => {
+    setup()
+
+    const record = notify({
+      project: "pkg",
+      session: "worker-a",
+      summary: "Default payload",
+      payload: undefined
+    })
+
+    expect(record.payload).toEqual({})
+  })
 })
 
 describe("bus internals", () => {

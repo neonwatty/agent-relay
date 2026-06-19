@@ -151,7 +151,7 @@ function listActiveClaimsByProjectId(db: RelayDb, projectId: string): BusRecord[
 }
 
 export function createNotification(input: NotifyInput): BusRecord {
-  const payload = Object.hasOwn(input, "payload") ? input.payload : {}
+  const payload = input.payload === undefined ? {} : input.payload
   return createBusRecord("notification", input, input.summary, payload, parseTtl(input.ttl ?? "60m"))
 }
 
