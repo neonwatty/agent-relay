@@ -15,3 +15,30 @@ export interface RelayConfig {
   cwd?: string
   now?: () => Date
 }
+
+export interface ProjectRefInput {
+  project?: string
+  session?: string
+  role?: string
+  status?: RelayStatus
+}
+
+export interface RelayProject {
+  id: string
+  name: string
+  rootPath: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RelaySession {
+  id: string
+  projectId: string
+  name: string
+  role?: string
+  cwd: string
+  status: RelayStatus
+  lastSeenAt: string
+  createdAt: string
+  updatedAt: string
+}
