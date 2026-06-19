@@ -3,7 +3,7 @@ import type { BusRecord, ClaimInput, ClaimQuery, ClaimResult, ClaimScope, Notify
 import { getConfig } from "./config.js"
 import { findScopeConflicts } from "./conflicts.js"
 import { openRelayDb, type RelayDb } from "./db.js"
-import { upsertProjectAndSession } from "./project-session.js"
+import { resolveProject, upsertProjectAndSession } from "./project-session.js"
 
 export function upsertPresence(input: PresenceInput): BusRecord {
   const db = openRelayDb()
@@ -101,14 +101,7 @@ export function listActiveClaims(query: ClaimQuery = {}): BusRecord[] {
   const db = openRelayDb()
   const now = getConfig().now().toISOString()
   const rows = query.project
-    ? db.prepare(`
-        select b.*, p.name as project_name, s.name as session_name
-        from bus_records b
-        join projects p on p.id = b.project_id
-        join sessions s on s.id = b.session_id
-        where b.kind = 'claim' and b.expires_at > ? and p.name = ?
-        order by b.created_at desc, b.rowid desc
-      `).all(now, query.project) as DbBusRecord[]
+    ? listActiveClaimRowsByResolvedProject(db, query.project, now)
     : db.prepare(`
         select b.*, p.name as project_name, s.name as session_name
         from bus_records b
@@ -119,6 +112,18 @@ export function listActiveClaims(query: ClaimQuery = {}): BusRecord[] {
       `).all(now) as DbBusRecord[]
 
   return rows.map(mapBusRecord)
+}
+
+function listActiveClaimRowsByResolvedProject(db: RelayDb, projectName: string, now: string): DbBusRecord[] {
+  const resolved = resolveProject({ project: projectName })
+  return db.prepare(`
+    select b.*, p.name as project_name, s.name as session_name
+    from bus_records b
+    join projects p on p.id = b.project_id
+    join sessions s on s.id = b.session_id
+    where b.kind = 'claim' and b.expires_at > ? and p.name = ? and p.root_path = ?
+    order by b.created_at desc, b.rowid desc
+  `).all(now, resolved.name, resolved.rootPath) as DbBusRecord[]
 }
 
 function listActiveClaimsByProjectId(db: RelayDb, projectId: string): BusRecord[] {

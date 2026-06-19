@@ -213,6 +213,34 @@ describe("bus API", () => {
     expect(second.conflicts).toEqual([])
   })
 
+  it("scopes same-name project claim listing to the current root", () => {
+    const homeDir = setup()
+    const firstRoot = join(homeDir, "workspace-a")
+    const secondRoot = join(homeDir, "workspace-b")
+    mkdirSync(firstRoot)
+    mkdirSync(secondRoot)
+    writeFileSync(join(firstRoot, "package.json"), JSON.stringify({ name: "shared-package" }))
+    writeFileSync(join(secondRoot, "package.json"), JSON.stringify({ name: "shared-package" }))
+
+    configureRelay({ homeDir, cwd: firstRoot })
+    const first = claim({
+      session: "worker-a",
+      scopes: [{ kind: "resource", name: "shared-db" }]
+    })
+
+    configureRelay({ homeDir, cwd: secondRoot })
+    const second = claim({
+      session: "worker-b",
+      scopes: [{ kind: "resource", name: "shared-db" }]
+    })
+
+    expect(second.conflicts).toEqual([])
+    expect(listClaims({ project: "shared-package" }).map((record) => record.id)).toEqual([second.record.id])
+
+    configureRelay({ homeDir, cwd: firstRoot })
+    expect(listClaims({ project: "shared-package" }).map((record) => record.id)).toEqual([first.record.id])
+  })
+
   it("creates notifications", () => {
     setup()
 
