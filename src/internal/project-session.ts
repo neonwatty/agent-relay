@@ -50,6 +50,23 @@ export function resolveProject(input: ProjectRefInput): ResolvedProjectInput {
   return { name: basename(config.cwd), rootPath: config.cwd }
 }
 
+export function findProjectIdsForQuery(db: RelayDb, projectName: string): string[] {
+  const projects = db.prepare("select * from projects where name = ?").all(projectName) as DbProject[]
+  if (projects.length <= 1) {
+    return projects.map((project) => project.id)
+  }
+
+  const currentRoot = inferProjectRoot(getConfig().cwd)
+  const currentProject = projects.find((project) => project.root_path === currentRoot)
+  if (currentProject) {
+    return [currentProject.id]
+  }
+
+  throw new Error(
+    `Project name "${projectName}" matches multiple roots; run from one of those roots to disambiguate`
+  )
+}
+
 function inferProjectRoot(start: string): string {
   return findUp(start, "package.json") ?? findUp(start, ".git") ?? resolve(start)
 }

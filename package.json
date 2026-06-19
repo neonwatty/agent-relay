@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MIT",
   "bin": {
-    "agent-relay": "./dist/cli.js"
+    "agent-relay": "dist/cli.js"
   },
   "exports": {
     ".": {
@@ -22,7 +22,7 @@
   "files": [
     "dist",
     "README.md",
-    "docs"
+    "docs/agent-relay-design.md"
   ],
   "scripts": {
     "build": "tsup",

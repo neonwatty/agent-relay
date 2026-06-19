@@ -2,7 +2,7 @@ import { nanoid } from "nanoid"
 import type { EventQuery, PublishEventInput, RelayEvent, RelayLink } from "../types.js"
 import { getConfig } from "./config.js"
 import { openRelayDb, type RelayDb } from "./db.js"
-import { resolveProject, upsertProjectAndSession } from "./project-session.js"
+import { findProjectIdsForQuery, upsertProjectAndSession } from "./project-session.js"
 import { DEFAULT_LATEST_LIMIT, DEFAULT_SEARCH_LIMIT, eventQuerySchema, publishEventSchema } from "./validation.js"
 
 export function publishEvent(input: PublishEventInput): RelayEvent {
@@ -70,11 +70,9 @@ export function searchEvents(query: EventQuery = {}): RelayEvent[] {
   const params: unknown[] = []
 
   if (parsed.project) {
-    const project = resolveProject({ project: parsed.project })
-    clauses.push("p.name = ?")
-    params.push(project.name)
-    clauses.push("p.root_path = ?")
-    params.push(project.rootPath)
+    const projectIds = findProjectIdsForQuery(db, parsed.project)
+    clauses.push(projectIds.length ? `e.project_id in (${projectIds.map(() => "?").join(", ")})` : "1 = 0")
+    params.push(...projectIds)
   }
   if (parsed.session) {
     clauses.push("s.name = ?")
