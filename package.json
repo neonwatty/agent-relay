@@ -1,0 +1,53 @@
+{
+  "name": "@neonwatty/agent-relay",
+  "version": "0.1.0",
+  "description": "Local machine-wide coordination ledger and bus for AI/developer sessions.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "agent-relay": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./bus": {
+      "types": "./dist/bus.d.ts",
+      "import": "./dist/bus.js",
+      "require": "./dist/bus.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist coverage",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "commander": "^14.0.0",
+    "nanoid": "^5.1.5",
+    "picomatch": "^4.0.2",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
