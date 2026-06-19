@@ -33,6 +33,6 @@ export const eventQuerySchema = z.object({
   type: z.string().min(1).optional(),
   status: statusSchema.optional(),
   tag: z.string().min(1).optional(),
-  since: z.string().min(1).optional(),
+  since: z.string().datetime().optional(),
   limit: z.number().int().positive().max(MAX_QUERY_LIMIT).optional()
 })

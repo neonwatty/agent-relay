@@ -1,47 +1,54 @@
 import { nanoid } from "nanoid"
 import type { EventQuery, PublishEventInput, RelayEvent, RelayLink } from "../types.js"
 import { getConfig } from "./config.js"
-import { openRelayDb } from "./db.js"
+import { openRelayDb, type RelayDb } from "./db.js"
 import { upsertProjectAndSession } from "./project-session.js"
 import { DEFAULT_LATEST_LIMIT, DEFAULT_SEARCH_LIMIT, eventQuerySchema, publishEventSchema } from "./validation.js"
 
 export function publishEvent(input: PublishEventInput): RelayEvent {
   const parsed = publishEventSchema.parse(input)
   const db = openRelayDb()
-  const { project, session } = upsertProjectAndSession(db, {
-    project: parsed.project,
-    session: parsed.session,
-    role: parsed.role,
-    status: parsed.status
-  })
-  const id = `evt_${nanoid()}`
-  const createdAt = getConfig().now().toISOString()
 
-  db.prepare(`
-    insert into events (id, project_id, session_id, type, status, summary, details, tags_json, links_json, created_at)
-    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    project.id,
-    session.id,
-    parsed.type,
-    parsed.status,
-    parsed.summary,
-    parsed.details ?? null,
-    JSON.stringify(parsed.tags),
-    JSON.stringify(parsed.links),
-    createdAt
-  )
+  return db.transaction(() => {
+    const { project, session } = upsertProjectAndSession(db, {
+      project: parsed.project,
+      session: parsed.session,
+      role: parsed.role,
+      status: parsed.status
+    })
+    const id = `evt_${nanoid()}`
+    const createdAt = getConfig().now().toISOString()
 
-  const event = getEventById(id)
-  if (!event) {
-    throw new Error(`Failed to publish event ${id}`)
-  }
-  return event
+    db.prepare(`
+      insert into events (id, project_id, session_id, type, status, summary, details, tags_json, links_json, created_at)
+      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      project.id,
+      session.id,
+      parsed.type,
+      parsed.status,
+      parsed.summary,
+      parsed.details ?? null,
+      JSON.stringify(parsed.tags),
+      JSON.stringify(parsed.links),
+      createdAt
+    )
+
+    const event = selectEventById(db, id)
+    if (!event) {
+      throw new Error(`Failed to publish event ${id}`)
+    }
+    return event
+  })()
 }
 
 export function getEventById(id: string): RelayEvent | undefined {
   const db = openRelayDb()
+  return selectEventById(db, id)
+}
+
+function selectEventById(db: RelayDb, id: string): RelayEvent | undefined {
   const row = db.prepare(`
     select e.*, p.name as project_name, s.name as session_name
     from events e

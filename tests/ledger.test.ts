@@ -68,6 +68,28 @@ describe("ledger API", () => {
     expect(event.createdAt).toBe("2026-01-01T00:00:00.000Z")
   })
 
+  it("filters search results by valid since timestamps", () => {
+    const dir = tempHome()
+    const dates = [
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-01T00:00:01.000Z",
+      "2026-01-01T00:00:02.000Z",
+      "2026-01-01T00:00:03.000Z"
+    ]
+    configureRelay({ homeDir: dir, cwd: dir, now: () => new Date(dates.shift() ?? "2026-01-01T00:00:03.000Z") })
+
+    publish({ project: "pkg", session: "since", type: "status.update", status: "info", summary: "Before" })
+    publish({ project: "pkg", session: "since", type: "status.update", status: "info", summary: "After" })
+
+    expect(search({ project: "pkg", since: "2026-01-01T00:00:02.000Z" }).map((event) => event.summary)).toEqual(["After"])
+  })
+
+  it("rejects invalid since timestamps", () => {
+    tempHome()
+
+    expect(() => search({ since: "banana" })).toThrow(/since/i)
+  })
+
   it("rejects oversized summaries", () => {
     tempHome()
     expect(() =>
