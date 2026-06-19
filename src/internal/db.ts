@@ -18,6 +18,7 @@ export function openRelayDb(): RelayDb {
   db = new Database(config.dbPath)
   db.pragma("journal_mode = WAL")
   db.pragma("busy_timeout = 5000")
+  db.pragma("foreign_keys = ON")
   migrate(db)
   return db
 }
