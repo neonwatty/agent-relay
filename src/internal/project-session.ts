@@ -77,6 +77,7 @@ export function upsertProjectAndSession(
     project = db.prepare("select * from projects where id = ?").get(id) as DbProject
   } else {
     db.prepare("update projects set updated_at = ? where id = ?").run(now, project.id)
+    project = db.prepare("select * from projects where id = ?").get(project.id) as DbProject
   }
 
   let session = db.prepare("select * from sessions where project_id = ? and name = ?").get(
