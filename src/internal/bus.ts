@@ -12,7 +12,7 @@ import { getConfig } from "./config.js"
 import { findScopeConflicts } from "./conflicts.js"
 import { openRelayDb, type RelayDb } from "./db.js"
 import { publishEvent } from "./ledger.js"
-import { resolveProject, upsertProjectAndSession } from "./project-session.js"
+import { findProjectIdsForQuery, upsertProjectAndSession } from "./project-session.js"
 import {
   createBusRecord,
   insertBusRecord,
@@ -134,15 +134,15 @@ export function listActiveClaims(query: ClaimQuery = {}): BusRecord[] {
 }
 
 function listActiveClaimRowsByResolvedProject(db: RelayDb, projectName: string, now: string): DbBusRecord[] {
-  const resolved = resolveProject({ project: projectName })
+  const projectIds = findProjectIdsForQuery(db, projectName)
   return db.prepare(`
     select b.*, p.name as project_name, s.name as session_name
     from bus_records b
     join projects p on p.id = b.project_id
     join sessions s on s.id = b.session_id
-    where b.kind = 'claim' and b.expires_at > ? and p.name = ? and p.root_path = ?
+    where b.kind = 'claim' and b.expires_at > ? and ${projectIds.length ? `b.project_id in (${projectIds.map(() => "?").join(", ")})` : "1 = 0"}
     order by b.created_at desc, b.rowid desc
-  `).all(now, resolved.name, resolved.rootPath) as DbBusRecord[]
+  `).all(now, ...projectIds) as DbBusRecord[]
 }
 
 function listActiveClaimsByProjectId(db: RelayDb, projectId: string): BusRecord[] {
