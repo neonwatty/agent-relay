@@ -1,9 +1,9 @@
 import { Command, CommanderError } from "commander"
-import { claim, listClaims, notify, presence, releaseClaim } from "./bus.js"
+import { cleanupExpiredBusRecords, claim, handoff, listClaims, notify, presence, releaseClaim } from "./bus.js"
 import { latest, publish, search } from "./index.js"
 import { exportJsonl } from "./internal/export.js"
 import { writeOutput } from "./internal/format.js"
-import type { ClaimScope, EventQuery, NotifyInput, PresenceInput, RelayStatus } from "./types.js"
+import type { ClaimScope, EventQuery, HandoffInput, NotifyInput, PresenceInput, RelayStatus } from "./types.js"
 
 const program = new Command()
 
@@ -152,6 +152,36 @@ program
   })
 
 program
+  .command("handoff")
+  .description("Create a durable handoff request and short-lived bus notification")
+  .requiredOption("--to-role <role>")
+  .requiredOption("--summary <summary>")
+  .option("--project <project>")
+  .option("--session <session>")
+  .option("--event-id <eventId>")
+  .option("--ttl <ttl>")
+  .option("--json")
+  .action((options: HandoffOptions) => {
+    const input: HandoffInput = {
+      project: options.project,
+      session: options.session,
+      toRole: options.toRole,
+      summary: options.summary,
+      eventId: options.eventId,
+      ttl: options.ttl
+    }
+    writeOutput(handoff(input), Boolean(options.json))
+  })
+
+program
+  .command("cleanup")
+  .description("Delete expired bus records")
+  .option("--json")
+  .action((options: JsonOption) => {
+    writeOutput({ deleted: cleanupExpiredBusRecords() }, Boolean(options.json))
+  })
+
+program
   .command("export")
   .description("Export durable ledger events")
   .option("--format <format>", "export format", "jsonl")
@@ -227,6 +257,15 @@ interface NotifyOptions extends JsonOption {
   session?: string
   status?: string
   summary: string
+  ttl?: string
+}
+
+interface HandoffOptions extends JsonOption {
+  project?: string
+  session?: string
+  toRole: string
+  summary: string
+  eventId?: string
   ttl?: string
 }
 

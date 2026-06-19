@@ -1,8 +1,19 @@
 import { nanoid } from "nanoid"
-import type { BusRecord, ClaimInput, ClaimQuery, ClaimResult, ClaimScope, NotifyInput, PresenceInput } from "../types.js"
+import type {
+  BusRecord,
+  ClaimInput,
+  ClaimQuery,
+  ClaimResult,
+  ClaimScope,
+  HandoffInput,
+  HandoffResult,
+  NotifyInput,
+  PresenceInput
+} from "../types.js"
 import { getConfig } from "./config.js"
 import { findScopeConflicts } from "./conflicts.js"
 import { openRelayDb, type RelayDb } from "./db.js"
+import { publishEvent } from "./ledger.js"
 import { resolveProject, upsertProjectAndSession } from "./project-session.js"
 
 export function upsertPresence(input: PresenceInput): BusRecord {
@@ -144,6 +155,36 @@ export function createNotification(input: NotifyInput): BusRecord {
   return createBusRecord("notification", input, input.summary, payload, parseTtl(input.ttl ?? "60m"))
 }
 
+export function createHandoff(input: HandoffInput): HandoffResult {
+  validateHandoffInput(input)
+
+  const event = publishEvent({
+    project: input.project,
+    session: input.session,
+    role: input.role,
+    type: "handoff.requested",
+    status: "todo",
+    summary: input.summary,
+    details: input.eventId ? `Related event: ${input.eventId}` : undefined,
+    tags: ["handoff", input.toRole]
+  })
+  const notification = createBusRecord(
+    "handoff",
+    input,
+    input.summary,
+    { toRole: input.toRole, eventId: event.id, relatedEventId: input.eventId },
+    parseTtl(input.ttl ?? "24h")
+  )
+
+  return { event, notification }
+}
+
+export function cleanupExpired(): number {
+  const db = openRelayDb()
+  const result = db.prepare("delete from bus_records where expires_at <= ?").run(getConfig().now().toISOString())
+  return result.changes
+}
+
 export function parseTtl(ttl: string): number {
   const match = ttl.match(/^(\d+)(m|h|d)$/)
   if (!match) {
@@ -159,7 +200,7 @@ export function parseTtl(ttl: string): number {
 
 function createBusRecord(
   kind: BusRecord["kind"],
-  input: PresenceInput | ClaimInput | NotifyInput,
+  input: PresenceInput | ClaimInput | NotifyInput | HandoffInput,
   summary: string | undefined,
   payload: unknown,
   ttlMs: number
@@ -204,6 +245,15 @@ function validateClaimInput(input: ClaimInput): void {
     } else if (scope.kind === "task" && scope.name.trim().length === 0) {
       throw new Error("Task claim scope requires a non-empty name")
     }
+  }
+}
+
+function validateHandoffInput(input: HandoffInput): void {
+  if (input.toRole.trim().length === 0) {
+    throw new Error("Handoff requires a non-empty toRole")
+  }
+  if (input.summary.trim().length === 0) {
+    throw new Error("Handoff requires a non-empty summary")
   }
 }
 

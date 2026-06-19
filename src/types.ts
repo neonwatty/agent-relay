@@ -137,3 +137,15 @@ export interface NotifyInput extends ProjectRefInput {
   payload?: unknown
   ttl?: string
 }
+
+export interface HandoffInput extends ProjectRefInput {
+  toRole: string
+  summary: string
+  eventId?: string
+  ttl?: string
+}
+
+export interface HandoffResult {
+  event: RelayEvent
+  notification: BusRecord
+}
