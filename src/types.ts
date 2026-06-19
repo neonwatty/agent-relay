@@ -42,3 +42,43 @@ export interface RelaySession {
   createdAt: string
   updatedAt: string
 }
+
+export interface RelayLink {
+  kind: "file" | "url"
+  path?: string
+  url?: string
+}
+
+export interface PublishEventInput extends ProjectRefInput {
+  type: string
+  status: RelayStatus
+  summary: string
+  details?: string
+  tags?: string[]
+  links?: RelayLink[]
+}
+
+export interface RelayEvent {
+  id: string
+  projectId: string
+  sessionId: string
+  project: string
+  session: string
+  type: string
+  status: RelayStatus
+  summary: string
+  details?: string
+  tags: string[]
+  links: RelayLink[]
+  createdAt: string
+}
+
+export interface EventQuery {
+  project?: string
+  session?: string
+  type?: string
+  status?: RelayStatus
+  tag?: string
+  since?: string
+  limit?: number
+}
